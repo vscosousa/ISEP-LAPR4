@@ -1,0 +1,139 @@
+@startuml
+
+title Class Diagram - US1001
+
+skinparam class {
+    skinparam classAttributeIconSize 0
+    skinparam packageStyle rectangle
+    skinparam shadowing false
+    skinparam linetype polyline
+    BackgroundColor #FEF9E7
+    ArrowColor Black
+}
+
+class "ImportApplicationUI" as UI {}
+
+class "ImportApplicationController" as ApplicationController {
+    +importCandidateInfo(folder):List<String>
+    +importJobReference(folder):jobReference
+    +importFiles(folder):List<String>
+    +registerApplication(candidate, jobReference, files):boolean
+}
+
+class ApplicationBuilder{
+    +build(candidate, jobOpening, files):Application
+}
+
+class Application{
+    -candidate:Candidate
+    -jobReference:JobReference
+    -files:List<File>
+    +create(candidate, jobOpening, files):Application
+
+}
+class File{
+    -path:String
+    + valueOf(file):File
+}
+class "Database" as DB <<(D, #8BEBFF)>> {
+}
+
+class ApplicationRepository{
+    +save(application):void
+}
+
+class JpaApplicationRepository{
+    +save(application):void
+}
+
+class JobOpeningRepository{
+    +findJobOpeningByJobReference(jobReference):JobOpening
+}
+class JpaJobOpeningRepository{
+    +findJobOpeningByJobReference(jobReference):JobOpening
+}
+
+class "RegisterCandidateController" as CandidateController {
+    +registerCandidate(firstName, lastName,email,phoneNumber):Candidate
+    +registerCandidateUser(candidate, user):void
+}
+
+class "CandidateService" as CandidateService {
+    +addCandidateUser(email, password, first name, last name):SystemUser
+}
+
+class "Candidate" as Candidate {
+    -companyName: String
+    -address: String
+    -CandidateCode: String
+    -email: String
+    -phone: String
+    +createCandidate(companyName: String, address: String, CandidateCode: String, email: String, phone: String): Candidate
+}
+
+class "CandidateRepository" as CandidateRepository {
+    +save(Candidate: Candidate): Candidate
+}
+
+class "JpaCandidateRepository" as JpaCandidateRepository {
+    +save(Candidate: Candidate): Candidate
+}
+
+class "RegisterCandidateUserController" as CandidateUserController {
+    +addCandidateUser(email: String, password: String, firstName: String, lastName: String): void
+}
+
+class "UserManagementService" as ManagementService {
+    +registerNewCandidateUser(email: String, password: String, firstName: String, lastName: String): User
+}
+
+class "UserTypesFactory" as Factory {
+    +withRoleCandidateUser(email: String, password: String, firstName: String, lastName: String): User
+}
+
+class "UserRepository" as UserRepository {
+    +save(user: User): User
+}
+
+class "JpaUserRepository" as JpaUserRepository {
+    +save(user: User): User
+}
+
+class "Database" as DB <<(D, #8BEBFF)>> {
+}
+
+UI --> CandidateController
+CandidateController --> CandidateService
+CandidateService --> Candidate
+CandidateService --> CandidateRepository
+CandidateRepository --> JpaCandidateRepository
+JpaCandidateRepository --> DB
+UI --> CandidateUserController
+CandidateUserController --> ManagementService
+ManagementService --> Factory
+ManagementService --> UserRepository
+UserRepository --> JpaUserRepository
+JpaUserRepository --> DB
+
+
+UI --> ApplicationController
+
+'ApplicationController
+
+ApplicationController --> JobOpeningRepository
+ApplicationController --> ApplicationRepository
+ApplicationController --> File
+ApplicationController --> ApplicationBuilder
+ApplicationBuilder --> Application
+
+
+
+'Repository
+JobOpeningRepository --> JpaJobOpeningRepository
+ApplicationRepository --> JpaApplicationRepository
+JpaApplicationRepository --> DB
+JpaJobOpeningRepository --> DB
+
+
+
+@enduml

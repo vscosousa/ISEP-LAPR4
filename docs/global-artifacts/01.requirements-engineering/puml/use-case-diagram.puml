@@ -1,0 +1,81 @@
+@startuml
+
+left to right direction
+
+actor "Project Manager" as PM #white;line:black;line.bold;text:black
+
+rectangle System {
+    usecase "Follow the technical constraints and concerns of the project" as G001
+    usecase "Use the defined project repository and setup a tool for project management" as G002
+    usecase "Configure the project structure" as G003
+    usecase "Setup a continuous integration server" as G004
+    usecase "Add the necessary scripts to the project" as G005
+    usecase "Elaborate a Domain Model using DDD" as G006
+    usecase "Support and apply authentication and authorization for all its users and functionalities." as G007
+    usecase "Process the files produced by the Applications Email Bot, so that they can be imported into the system by initiative of the Operator" as 2001
+}
+
+PM --> G001
+PM --> G002
+PM --> G003
+PM --> G004
+PM --> G005
+PM --> G006
+PM --> G007
+PM --> 2001
+
+actor "Admin" as AD #white;line:red;line.bold;text:black
+actor "Operator" as OP #white;line:blue;line.bold;text:black
+actor "Customer Manager" as CM #white;line:green;line.bold;text:black
+actor "Language Engineer" as LE #white;line:purple;line.bold;text:black
+
+rectangle Backoffice {
+    usecase "Manage Customers and Managers" as UC1
+    usecase "Manage Backoffice Users" as US1000
+    usecase "Manage Job Openings" as US1002
+    usecase "Manage Candidates" as US2000a
+    usecase "Manage Applications" as US2002
+    usecase "Manage Job Opening Process Phases" as US1007
+    usecase "Manage Plugins" as US1008
+    usecase "Manage Job Opening Requirements" as US1009
+    usecase "Generate and Export Templates" as US1012
+    usecase "Rank Candidates" as US1013
+}
+
+AD --> UC1
+AD --> US1000
+CM --> US1002
+OP --> US2000a
+OP --> US2002
+CM --> US1007
+LE --> US1008
+CM --> US1009
+CM --> US1012
+LE --> US1012
+CM --> US1013
+
+actor "Candidate" as CA #white;line:orange;line.bold;text:black
+
+rectangle "Candidate App" {
+    usecase "Follow Applications" as UC5
+}
+
+CA --> UC5
+
+actor "Applications Email Bot" as EB #white;line:brown;line.bold;text:black
+
+rectangle "Applications File Bot" {
+    usecase "Import Applications Files" as UC6
+}
+
+EB --> UC6
+
+actor "Customer" as CU #white;line:yellowgreen;line.bold;text:black
+
+rectangle "Customer App" {
+    usecase "Follow Job Openings" as UC7
+}
+
+CU --> UC7
+
+@enduml

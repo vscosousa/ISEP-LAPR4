@@ -1,0 +1,253 @@
+@startuml
+skinparam linetype ortho
+skinparam maxmessagesize 200
+skinparam sequenceParticipant underline
+
+actor "Customer Manager" as Manager
+
+participant "OpenOrClosePhaseUI" as UI
+participant "OpenOrClosePhaseController" as C
+participant "RecruitmentProcessRepository" as R
+participant "JpaRecruitmentProcessRepository" as RJPA
+participant "JobOpeningRepository" as JOR
+participant "JpaJobOpeningRepository" as JOJPA
+participant "RecruitmentProcess" as RP
+participant "JobOpening" as JO
+participant "ApplicationPhase" as AP
+participant "ScreeningPhase" as SP
+participant "InterviewPhase" as IP
+participant "AnalysisPhase" as ANP
+participant "ResultPhase" as REP
+database "H2Database" as DB
+
+activate Manager
+
+Manager -> UI : Asks to change the phase status of a job opening
+
+ref over UI : US-1003 - List Job Openings
+UI --> Manager : Provides a list of job openings and asks to choose one
+
+deactivate UI
+
+Manager -> UI : Selects a job opening
+activate UI
+
+UI -> C : findById(jobReference)
+activate C
+C -> R : findById(jobReference)
+activate R
+R -> RJPA : findById(jobReference)
+activate RJPA
+RJPA -> DB : createQuery("SELECT * FROM T_RECRUITMENT_PROCESS WHERE JOBOPENING_JOBREFERENCE = jobReference")
+DB --> RJPA : return recruitmentProcess
+RJPA --> R : return recruitmentProcess
+deactivate RJPA
+R --> C : return recruitmentProcess
+deactivate R
+
+C -> R : getCurrentPhase(recruitmentProcess)
+activate R
+R -> RJPA : getCurrentPhase(recruitmentProcess)
+activate RJPA
+RJPA -> DB : createQuery("SELECT 'AnalysisPhase' AS phase FROM T_ANALYSIS_PHASE a JOIN T_RECRUITMENT_PROCESS r ON a.PK = r.ANALYSISPHASE_PK WHERE r.JOBOPENING_JOBREFERENCE = 'CUSTOMER-1' AND a.STATENAME = 'OPEN' UNION ALL ...")
+DB --> RJPA : return phase
+RJPA --> R : return phase
+deactivate RJPA
+R --> C : return phase
+deactivate R
+C -> UI : return phase
+deactivate C
+
+UI --> Manager : Displays the current phase status of the job opening and asks if the manager wants to go to the next phase or go back to the previous phase
+
+deactivate UI
+
+Manager -> UI : Chooses to go to the next phase or go back to the previous phase
+activate UI
+
+UI -> C : changePhase(phase, jobOpening, decision)
+activate C
+alt phase == null
+    alt jobOpening.state == "PENDING"
+        alt decision == "NEXT"
+            C -> AP : open()
+            activate AP
+            AP -> AP : open()
+            deactivate AP
+            C -> JO: activate()
+            activate JO
+            JO -> JO: activate()
+            deactivate JO
+        else
+            C --> UI: return exception "The job opening is in the initial state! Cannot go to a previous phase"
+        end
+    else jobOpening.state == "CLOSED"
+        alt decision == "NEXT"
+            C --> UI: return exception "The job opening is in the final state! Cannot go to a next phase"
+        else
+            C -> REP : close()
+            activate REP
+            REP -> REP : close()
+            deactivate REP
+            C -> JO: deactivate(currentPhase)
+            activate JO
+            JO -> JO: deactivate(currentPhase)
+            deactivate JO
+        end
+    else
+        C --> UI: return exception "The job opening is in an invalid state"
+    end
+else phase == "ApplicationPhase"
+    C -> AP : close()
+    activate AP
+    AP -> AP : close()
+    deactivate AP
+    alt decision == "NEXT"
+        alt !hasApplications(theJobOpening)
+            C --> UI: return exception ""No requirements specifications associated with the job opening: " + theJobOpening.jobReference()"
+        else !hasApplications(theJobOpening)
+            C --> UI: return exception "You cannot move to the screening phase without applications"
+        else 
+            C -> SP : open()
+            activate SP
+            SP -> SP : open()
+            deactivate SP
+        end
+    else
+        alt !hasApplications(theJobOpening)
+            C -> JO: deactivate()
+            activate JO
+            JO -> JO: deactivate()
+            deactivate JO
+        else
+            C --> UI: return exception "Cannot go to the previous phase! Application phase is already in progress"
+        end
+    end
+else phase == "ScreeningPhase"
+    C -> SP : close()
+    activate SP
+    SP -> SP : close()
+    deactivate SP
+    alt decision == "NEXT"
+        alt recruitmentProcess.interviewPhase() != null
+            alt !hasInterviewModel(theJobOpening)
+                C --> UI: return exception ""No interview model associated with the job opening: " + theJobOpening.jobReference()
+            else 
+                C -> IP : open()
+                activate IP
+                IP -> IP : open()
+                deactivate IP
+            end
+        else
+            C -> ANP : open()
+            activate ANP
+            ANP -> ANP : open()
+            deactivate ANP
+        end
+    else
+        alt !hasScreeningResults(theJobOpening)
+            C -> AP : open()
+            activate AP
+            AP -> AP : open()
+            deactivate AP
+        else
+            C --> UI: return exception "Cannot go to the previous phase! Screening phase is already in progress"
+        end 
+    end
+else phase == "InterviewPhase"
+    C -> IP : close()
+    activate IP
+    IP -> IP : close()
+    deactivate IP
+    alt decision == "NEXT"
+        C -> ANP : open()
+        activate ANP
+        ANP -> ANP : open()
+        deactivate ANP
+    else 
+        alt !hasEvaluatedInterviews(theJobOpening)
+            C -> SP : open()
+            activate SP
+            SP -> SP : open()
+            deactivate SP
+        else
+            C --> UI: return exception "Cannot go to the previous phase! Interview phase is already in progress"
+        end
+    end
+else phase == "AnalysisPhase"
+    C -> ANP : close()
+    activate ANP
+    ANP -> ANP : close()
+    deactivate ANP
+    alt decision == "NEXT"
+        C -> REP : open()
+        activate REP
+        REP -> REP : open()
+        deactivate REP
+    else
+        alt !hasRanking(theJobOpening)
+            alt recruitmentProcess.interviewPhase() != null
+                C -> IP : open()
+                activate IP
+                IP -> IP : open()
+                deactivate IP
+            else
+                C -> SP : open()
+                activate SP
+                SP -> SP : open()
+                deactivate SP
+            end
+        else
+            C --> UI: return exception "Cannot go to the previous phase! Analysis phase is already in progress"
+        end
+    end
+else phase == "ResultPhase"
+    C -> REP : close()
+    activate REP
+    REP -> REP : close()
+    deactivate REP
+    alt decision == "NEXT"
+        C -> JO: deactivate(currentPhase)
+        activate JO
+        JO -> JO: deactivate(currentPhase)
+        deactivate JO
+    else
+        alt !hasResults(theJobOpening)
+            C -> ANP : open()
+            activate ANP
+            ANP -> ANP : open()
+            deactivate ANP
+        else
+            C --> UI: return exception "Cannot go to the previous phase! Result phase is already in progress"
+        end
+    end
+else default
+    C --> UI: return exception "Invalid phase: " + currentPhase
+end
+
+C -> R : save(recruitmentProcess)
+activate R
+R -> RJPA : save(recruitmentProcess)
+activate RJPA
+RJPA -> DB : merge(recruitmentProcess)
+DB --> RJPA : return recruitmentProcess
+RJPA --> R : return recruitmentProcess
+R --> C : return recruitmentProcess
+deactivate RJPA
+deactivate R
+C -> JOR : save(jobOpening)
+activate JOR
+JOR -> JOJPA : save(jobOpening)
+activate JOJPA
+JOJPA -> DB : merge(jobOpening)
+DB --> JOJPA : return jobOpening
+JOJPA --> JOR : return jobOpening
+JOR --> C : return jobOpening
+deactivate JOJPA
+deactivate JOR
+C --> UI : return true
+
+UI --> Manager : Informs success or failure
+
+deactivate UI
+@enduml

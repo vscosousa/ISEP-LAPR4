@@ -1,0 +1,104 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <signal.h>
+#include "info.h"
+#include "utils.h"
+#include <sys/types.h>
+#include <dirent.h>
+#include <ctype.h>
+#include <time.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+/**
+ * @file reportFile.c
+ * @brief This file contains the functions to generate a report file for a candidate and to check if a candidate file exists in the report file.
+ */
+
+/**
+ * @brief Generates a report file for a candidate.
+ *
+ * This function generates a report file for a candidate based on the provided configuration,
+ * shared memory, and candidate information. The report file contains details such as the
+ * candidate ID, job offer directory, and a list of files associated with the candidate.
+ *
+ * @param config The configuration settings.
+ * @param shared_memory The shared memory buffer.
+ * @param sem_sharedmemory_mutex The semaphore for synchronizing access to the shared memory.
+ * @param buffer_size The semaphore for controlling the buffer size.
+ */
+void reportFile(Config *config, CircularBuffer *shared_memory, sem_t *sem_sharedmemory_mutex, sem_t *buffer_size)
+{
+    sem_wait(sem_sharedmemory_mutex); // access shared memory
+    CandidateInfo candidateInfo = checkFinishedFiles(shared_memory);
+    sem_post(sem_sharedmemory_mutex); // release shared memory
+
+    if (candidateInfo.candidateID == -1)
+        return;
+
+    char buffer[3000];
+    sprintf(buffer, "%sreport.txt", config->outputPath);
+
+    if (checkIfCandidateFileExists(candidateInfo, buffer))
+        printf("-> Candidate ID: %d already exists in the report file.\n", candidateInfo.candidateID);
+    else
+    {
+        FILE *file = fopen(buffer, "a");
+        if (file == NULL)
+        {
+            errorMessages("Failed to create file.\n");
+            exit(EXIT_FAILURE);
+        }
+        // Print Info
+        fprintf(file, "Candidate ID: %d\n", candidateInfo.candidateID);
+        fprintf(file, "Job Offer: %s\n", candidateInfo.jobOffer_dir);
+        fprintf(file, "\tFiles:\n");
+        for (int j = 0; j < candidateInfo.numFiles; j++)
+        {
+            fprintf(file, "\t\t%s\n", candidateInfo.files[j]);
+        }
+        fprintf(file, "\n");
+
+        fclose(file);
+        printf("-> Report file has been generated for candidate:%d\n", candidateInfo.candidateID);
+    }
+    sem_post(buffer_size);
+}
+
+/**
+ * @brief Checks if a candidate file exists in the report file.
+ *
+ * This function opens the report file and reads each line,
+ * looking for a line that starts with "Candidate ID: " followed by the candidate's ID.
+ * If it finds such a line, it returns 1. If it reaches the end of the file without
+ * finding such a line, it returns 0.
+ *
+ * @param candidate The candidate information.
+ * @param buffer The file path of the report file.
+ * @return Returns 1 if the candidate ID already exists in the report file, 0 otherwise.
+ */
+int checkIfCandidateFileExists(CandidateInfo candidate, char *buffer)
+{
+    FILE *file = fopen(buffer, "r");
+    if (file == NULL)
+        return 0;
+
+    int id;
+    char line[500];
+
+    while (fgets(line, sizeof(line), file) != NULL)
+    {
+        if (sscanf(line, "Candidate ID: %d", &id) == 1)
+        {
+            if (candidate.candidateID == id)
+                return 1;
+        }
+    }
+
+    fclose(file);
+    return 0;
+}
